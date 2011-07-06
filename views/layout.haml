@@ -1,0 +1,48 @@
+!!! 5
+%html{ :lang => "en" }
+  %head
+    %meta{ :charset => "utf-8" }    
+
+    / Always force latest IE rendering engine (even in intranet) & Chrome Frame
+    %meta{ :content => "IE=edge,chrome=1", "http-equiv" => "X-UA-Compatible" }
+
+    / Comment in layout
+
+    = stylesheet_link_tag "site.css"
+
+    :javascript
+      // Comment in javascript
+
+    = yield_content :head
+    
+  %body{ :class => page_classes }
+    #header
+      #header-container
+        #header-logo
+          = image_tag("geckocircle-logo.png")
+        #navbar
+          #left-edge
+            = image_tag("edge-left.gif")
+          %span#right-edge
+            = image_tag("edge-right.gif")
+          %ul.navbar
+            %li 
+              = link_to("Home", "/")
+            %li 
+              = link_to("lipService", "/lipservice.html")
+            %li 
+              = link_to("Support", "/support.html")
+            %li 
+              = link_to("About", "/")
+          
+          
+    
+    #main-container
+      #main-content{ :role => "main" }
+        = yield
+      
+
+    
+      
+      #footer
+        Copyright &copy; 2011 GeckoCircle.com.  All Rights Reserved.

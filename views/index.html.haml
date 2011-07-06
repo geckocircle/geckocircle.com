@@ -1,0 +1,28 @@
+- content_for :head do
+  %title GeckoCircle.com
+
+.content
+  %p 
+    GeckoCircle.com is currently the home of my open-source projects. If you are looking for my shareware products, including 
+    = link_to "MacSudoku", "http://www.rosboroughtech.com/products/macsudoku"
+    and 
+    = link_to "MacKakuro", "http://www.rosboroughtech.com/products/mackakuro" 
+    please visit 
+    = link_to "Rosborough Tech Co.", "http://www.rosboroughtech.com"
+
+
+  %h2 Projects
+  %ul
+    %li
+      = link_to "lipService", "/lipservice.html"
+
+
+  %h2 Websites
+  %ul
+    %li
+      = link_to "Rosborough Tech Co.", "http://www.rosboroughtech.com"
+    %li
+      = link_to "iWorkCommunity.com", "http://www.iworkcommunity.com"
+    
+.sidebar
+  = image_tag "/images/gecko-photo.jpg"

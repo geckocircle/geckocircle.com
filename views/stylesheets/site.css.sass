@@ -1,0 +1,83 @@
+@import "compass"
+@import "blueprint"
+// @import "blueprint/grid"
+// @import "blueprint/debug"
+
+$gecko-green:        #749e74
+
+$font-color:         #2a2a2a
+$link-color:         $gecko-green
+$link-hover-color:   #009ce0
+$link-focus-color:   $link-color
+$link-active-color:  $link-color
+$link-visited-color: $link-color
+
+$blueprint-font-family:  'Century Gothic', 'Apple Gothic', 'Helvetica Neue', arial, sans-serif
+$blueprint-font-size: 13px
+
++global-reset
+
++blueprint-typography
++blueprint-grid
+
+a
+  +link-colors($link-color, $link-hover-color, $link-focus-color, $link-active-color, $link-visited-color)
+  text-decoration: none
+
+// #container
+//  // mixin +container if this element will contain columns
+//  +container
+
+#header
+  height: 100px
+  background: url('/images/header-bg.gif') repeat-x
+  #header-container
+    +container
+    overflow: visible
+    #header-logo
+      height: 53px
+      padding-top: 20px
+    #navbar
+      +column(24, "true")
+      +container
+      background: url('/images/navbar-bg.gif') repeat-x
+      overflow: visible
+      #left-edge
+        display: inline
+        margin-left: -13px
+      #navbar-content
+        +column(24, "true")
+        height: 2px
+      #right-edge
+        display: inline
+        float: right
+        margin-right: -13px
+         
+#main-container
+  +container
+  overflow: visible
+  #main-content
+    +column(24, "true")
+    .content
+      +column(18)
+    .sidebar
+      +column(6, "true")
+    .content-full
+      +column(24, "true")
+
+  #footer
+    +column(24, "true")
+    +prepend-top
+    border-top: 1px solid #ddd
+    font-size: 10px
+    color: #888
+    
+ul.navbar
+  font-weight: bold
+  text-transform: uppercase
+  margin: -22px 0 22px 4px
+  padding: 0
+  list-style-type: none
+  li
+    display: inline
+    margin-right: 3em
