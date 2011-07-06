@@ -1,0 +1,3 @@
+# GeckoCircle.com
+
+This repository contains the source code for GeckoCircle.com.  The site is built using [MiddleMan](https://github.com/tdreyno/middleman).  It uses Blueprint CSS for grid layout.  That's about it.
