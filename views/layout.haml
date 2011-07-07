@@ -25,16 +25,7 @@
             = image_tag("edge-left.gif")
           %span#right-edge
             = image_tag("edge-right.gif")
-          %ul.navbar
-            %li 
-              = link_to("Home", "/")
-            %li 
-              = link_to("lipService", "/lipservice.html")
-            %li 
-              = link_to("Support", "/support.html")
-            %li 
-              = link_to("About", "/")
-          
+          = render "partials/_navbar"
           
     
     #main-container
