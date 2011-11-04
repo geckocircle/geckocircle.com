@@ -1,0 +1,94 @@
+- content_for :head do
+  %title GeckoCircle.com - Securing SSH on your server
+
+.content
+  :markdown
+  
+    ## Securing SSH on your Ubuntu 11.04 server
+
+    There are a couple of simple things you might want to consider if you are running SSH on a server.  One, you will want to consider changing the port, since script-kiddies around the world look first for an open port 22 to wreak their havoc.  Changing the port will not stop a determined attacker, but it may filter out the "shot-in-the-dark" hackers looking for an easy target.  Second, you'll almost definitely want to shut off logging in as root.  If that password does get compromised, you're in some trouble.  Finally, I like to shut off password-based authentication altogether, and rely on RSA private/public keys.  This has the added bonus of allowing you to log in to your server without typing your password, assuming you're on a computer that has your private key.
+    
+    
+    To set up key-based authentication, you'll need to generate a private/public key pair on your local (client) machine.
+    
+    _Note: I will prefix commands to run on your local computer with a $, and commands which should be run on the server with #_
+    
+    
+        $ ssh-keygen -t rsa
+        
+        
+    Follow the prompts - it's up to you whether you want to use a password or not.  I tend to not use a password, but then anyone who gets access to my private key can access my servers.
+    
+    You'll need to copy the public key you just generated to the server, as follows:
+
+        $ scp ~/.ssh/id_rsa.pub user@yourserver.com:~/.ssh/authorized_keys
+    
+    Then, log in to your server and lock that file down!
+    
+        $ ssh user@yourserver.com
+    
+    On the server,
+    
+        # chmod 400 ~/.ssh/authorized_keys
+    
+    To change the port and disable root login and password authentication, you need to edit the sshd_config file on the server:
+
+        # sudo vim /etc/ssh/sshd_config
+
+    Find and change the following lines:
+
+        Port 1234
+        PermitRootLogin no
+        PasswordAuthentication no
+    
+    For your port, instead of 1234, pick some number between 1024 and 65535.
+  
+    If you're not an expert in vim, here's a couple of things you'll want to know:
+
+        /Port    --> will search for the word Port
+        dw        --> will delete the word your cursor is on
+        i         --> enters "insert" mode so you can type new text
+        Esc       --> gets you out of insert mode
+        :wq       --> will write your file, and quit
+        :q!       --> will quit without saving
+    
+        # nano    --> a much more user-friendly editor than vim
+
+    
+    Save your file and exit the editor.
+  
+    Reboot SSHD on your server, then log out:
+
+        # sudo service ssh restart
+        # exit
+
+    Try logging back into your server with the new port - you shouldn't need your password this time.
+
+        $ ssh myusername@YOUR.SERVER.IP.ADDRESS -p 1234
+    
+    ## Setting up an alias on your client
+    
+    One last nice trick: if you want to avoid having to type port numbers, long ip addresses or domain names, etc, you can create an alias on your local machine.  If you're using PuTTY or something like it, you just create a "favourite" with all your settings.  From the command-line on Mac or Linux, however, you might:
+    
+        $ cd ~/.ssh
+        $ vim config
+        
+    Create an entry like this:
+    
+        Host myhost
+        	Hostname YOUR.SERVER.IP.ADDRESS
+        	User myusername
+        	Port 1234
+        	ForwardAgent no
+        	ForwardX11 no
+    
+    Being paranoid, I like to lock down the permissions on my config file so only I can read it:
+    
+        $ chmod 600 config
+    
+    Then, you can simply log into your server as follows:
+    
+        $ ssh myhost
+
+.sidebar
+  = render "/partials/_howto_sidebar"

@@ -1,3 +1,11 @@
+# activate :blog
+# set :blog_permalink, "blog/:year/:month/:day/:title.html"
+# set :blog_taglink, "blog/tags/:tag.html"
+# set :blog_layout, "blog_layout"
+# set :blog_layout_engine, "haml"
+
+# page "/feed.xml", :layout => false
+
 # CodeRay syntax highlighting in Haml
 # activate :code_ray
 

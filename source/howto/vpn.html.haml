@@ -1,0 +1,272 @@
+- content_for :head do
+  %title GeckoCircle.com - Setting up a cheap IPsec / L2TP VPN on an Ubuntu 11.04 VPS
+
+.content
+  :markdown
+    ## IPsec / L2TP VPN on an Ubuntu 11.04 VPS
+
+    I use a VPN (Virtual Private Network) connection to access some of my servers when I'm on public WiFi networks or other untrusted networks.  VPNs can be useful for encrypting traffic between you and the VPN (preventing password sniffing, for example).  Lots of people will also use VPNs to make it appear as if their traffic is coming from another country - for example, to test GeoIP-dependant features of websites.  There's a number of VPN services on the net, such as StrongVPN or HotspotShield, that seem to cater to those wanting to watch Hulu in Canada, but that seems a bit sketchy.  Besides, you can have your own personal VPN for way cheaper than StrongVPN's monthly fee.
+
+    Here's what I did - I found a special price by Googling around for a [Xen-based 256MB VPS](http://www.google.com/?q=cheap+xen+vps) (virtual private server).  As best as I could tell, you really don't want an OpenVZ VPS, as IPsec isn't (or at least wasn't - haven't tested recently) supported on OpenVZ.  I'm not sure about VMWare.  I found a Xen VPS in Texas for $3.75/mo, with a couple of hundred GB of bandwidth, which is total overkill for my purposes (and for the video-streaming folk, this is quite a lot of video).  I configured the VPS with Ubuntu 11.04.  From a plain-vanilla Ubuntu 11.04, here's how you would proceed to get an OpenSWAN IPSec / L2TP VPN up and running that will allow you to connect pretty much any computer or mobile device.
+
+    ## Basic Linux-y Stuff
+
+    You'll need to SSH into your new VPS - if you're a Mac or Linux user, it's simple.  Just launch your Terminal, and type:
+
+    	$ ssh root@YOUR.SERVER.IP.ADDRESS
+
+    If you're on Windows, grab [PuTTY](http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html) or some other SSH client.
+
+    Once logged in as root, set up a user account (since it's bad form to use root when you don't have to):
+
+    	$ adduser drosboro
+
+    Follow the prompts, and pick a good password.  Then,
+
+    	$ visudo
+
+    In the sudoers file, add the following line:
+
+    	myusername ALL=(ALL:ALL) ALL
+
+    Save the file, then:
+
+    	$ exit
+
+    From your computer, start a new SSH session with your new user:
+
+    	$ ssh myusername@YOUR.SERVER.IP.ADDRESS
+
+
+    Install some handy packages that we'll need:
+
+    	$ sudo aptitude install vim build-essential libgmp3-dev gawk flex bison
+
+    ### Setting up SSH securely
+
+    I don't like using password authentication with SSH, and I also don't like running SSH on it's regular port.  Changing the port and using RSA key-based authentication will prevent some attacks.
+
+    To change the port, you need to edit the sshd_config file:
+
+    	$ sudo vim /etc/ssh/sshd_config
+
+    Change the following lines:
+
+    	Port 1234
+    	PermitRootLogin no
+    	PasswordAuthentication no
+
+    For your port, instead of 1234, pick some number between 1024 and 65535.
+
+    Save your file and exit the editor.
+
+    I won't go into making SSH keys, but if you google ["set up SSH keys"](http://www.google.com/?q=set+up+ssh+keys), you'll get lots of hits.  Once you've got your public key,
+
+    	$ mkdir ~/.ssh
+    	$ cat > ~/.ssh/authorized_keys
+
+    Paste your public key, then type control-D to end the input.  
+
+    Reboot SSHD on your server, then log out:
+
+    	$ sudo service ssh restart
+    	$ exit
+
+    Try logging back into your server with the new port - you shouldn't need your password this time.
+
+    	$ ssh myusername@YOUR.SERVER.IP.ADDRESS -p 1234
+
+    ## Getting IPSec up and running
+
+    First, install OpenSWAN - for this server, I used the latest (at the time) version and built it from source:
+
+    	$ mkdir src
+    	$ cd src
+    	$ wget http://openswan.org/download/openswan-2.6.37.tar.gz
+    	$ tar xvzf openswan-2.6.37.tar.gz
+    	$ cd openswan-2.6.37
+    	$ make programs
+    	$ sudo make install
+
+    Edit your IPSec configuration:
+
+    	$ sudo vim /etc/IPSec.conf
+
+    Here's the contents of the file, borrowed from elsewhere on the web:
+
+        version 2.0
+        config setup
+            nat_traversal=yes
+            virtual_private=%v4:10.0.0.0/8,%v4:192.168.0.0/16,%v4:172.16.0.0/12
+            oe=off
+            protostack=netkey
+    
+        conn %default
+            forceencaps=yes
+    
+        conn L2TP-PSK-NAT
+            rightsubnet=vhost:%priv
+            also=L2TP-PSK-noNAT
+      
+        conn L2TP-PSK-noNAT
+            authby=secret
+            pfs=no
+            auto=add
+            keyingtries=3
+            rekey=no
+            ikelifetime=8h
+            keylife=1h
+            type=transport
+            left=YOUR.VPS.IP.ADDRESS
+            leftprotoport=17/1701
+            right=%any
+            rightprotoport=17/%any
+
+    Then,
+
+    	$ sudo vim /etc/IPSec.secrets
+
+    This file should contain a line that looks like this:
+
+    	YOUR.VPS.IP.ADDRESS %any: PSK "YourSecretCode"
+
+    "YourSecretCode" is a shared secret that every user (in my case, just me) of the VPN will know.  There's also a per-user password coming later.
+
+    Lock down the secrets file:
+
+    	$ sudo chmod 640 /etc/IPSec.secrets
+
+    To get IPSec running properly, you will need to adjust a few networking settings.  There's various ways to do this, but I did it like this:
+
+    	$ ls /proc/sys/net/ipv4/conf
+
+    Make a note of all of the interfaces.  For my install, I had "all", "default", "eth0" and "lo".
+
+    	$ sudo vim /etc/sysctl.conf
+
+    Add the following lines - but if your network interfaces are different than mine, you'll need to make the appropriate changes:
+
+    	net.ipv4.ip_forward=1
+    	net.ipv4.conf.all.accept_redirects = 0
+    	net.ipv4.conf.default.accept_redirects = 0
+    	net.ipv4.conf.lo.accept_redirects = 0
+    	net.ipv4.conf.eth0.accept_redirects = 0
+    	net.ipv4.conf.all.send_redirects = 0
+    	net.ipv4.conf.lo.send_redirects = 0
+    	net.ipv4.conf.default.send_redirects = 0
+    	net.ipv4.conf.eth0.send_redirects = 0
+
+    Load your new settings with:
+
+    	$ sudo sysctl -p
+	
+    Then, try starting and verifying IPSec:
+
+    	$ sudo service ipsec start
+    	$ sudo ipsec verify
+
+    I got the following output from the verify command:
+
+    	Checking your system to see if IPsec got installed and started correctly:
+    	Version check and ipsec on-path                             	[OK]
+    	Linux Openswan U2.6.37/K2.6.38-8-generic-pae (netkey)
+    	Checking for IPsec support in kernel                        	[OK]
+    	 SAref kernel support                                       	[N/A]
+    	 NETKEY:  Testing XFRM related proc values                  	[OK]
+    		[OK]
+    		[OK]
+    	Checking that pluto is running                              	[OK]
+    	 Pluto listening for IKE on udp 500                         	[OK]
+    	 Pluto listening for NAT-T on udp 4500                      	[OK]
+    	Checking for 'ip' command                                   	[OK]
+    	Checking /bin/sh is not /bin/dash                           	[WARNING]
+    	Checking for 'iptables' command                             	[OK]
+    	Opportunistic Encryption Support                            	[DISABLED]
+
+    If the "Checking for IPsec support in kernel" line reads \[FAILED\], you may need to load the appropriate kernel module:
+
+    	$ sudo modprobe af_key
+
+    If that's the case, you'll want that to happen every time you boot, so add it to /etc/modules:
+
+    	$ sudo vim /etc/modules
+
+    Add the line:
+
+    	af_key
+
+    And you're done.
+
+    ### Setting up L2TP
+
+    This part should be fairly straightforward.  First, install xl2tpd, then configure it:
+
+    	$ sudo aptitude install xl2tpd
+    	$ sudo vim /etc/xl2tpd/xl2tpd.conf
+
+    The contents of my file look like this:
+
+    	[lns default]
+    	ip range = 10.1.1.2-10.1.1.255
+    	local ip = 10.1.1.1
+    	require chap = yes
+    	refuse pap = yes
+    	require authentication = yes
+    	name = LinuxVPNserver
+    	ppp debug = yes
+    	pppoptfile = /etc/ppp/options.xl2tpd
+    	length bit = yes
+
+    Then, 
+
+    	$ sudo vim /etc/ppp/options.xl2tpd
+
+    The contents look like this:
+
+    	require-mschap-v2
+    	ms-dns 8.8.8.8
+    	ms-dns 8.8.4.4
+    	asyncmap 0
+    	auth
+    	crtscts
+    	lock
+    	hide-password
+    	modem
+    	debug
+    	name l2tpd
+    	proxyarp
+    	lcp-echo-interval 30
+    	lcp-echo-failure 4
+
+    Last but not least, edit the following file to set up your user accounts:
+
+    	$ sudo vim /etc/ppp/chap-secrets
+
+    Each desired user needs their own line in this file, following the format:
+
+    	YOURUSERNAME l2tpd YOURPASSWORD *
+
+    ## Finishing Up
+
+    You need to enable IP Masquerade in your firewall to allow access to the rest of the web from your VPN.  I just did this in my rc.local:
+
+    	$ sudo vim /etc/rc.local
+
+    I added the following lines before the "exit 0" line:
+
+    	iptables -t nat -A POSTROUTING -s 10.1.1.0/24 -o eth0 -j MASQUERADE
+    	service ipsec restart
+
+    Probably not necessary, but I like to finish off with a nice reboot, just to make sure everything will load up properly between server restarts...
+
+    	$ sudo reboot
+
+    That's it!  At this point, you just need to configure your own devices to connect to your VPN.
+
+    ## Credit, where credit is due!
+
+    I got lots of guidance from [this How-To](http://freenuts.com/how-to-set-up-a-l2tpipsec-vpn-in-a-vps/) - in fact, I've used its config files nearly exactly.  I changed a few things to make them align a bit more with my own personal Linux-y style.
+
+
+.sidebar
+  = render "/partials/_howto_sidebar"

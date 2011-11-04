@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <!-- Always force latest IE rendering engine (even in intranet) & Chrome Frame -->
+    <!-- %meta{ :content => "IE=edge,chrome=1", "http-equiv" => "X-UA-Compatible" } -->
+    <!-- Comment in layout -->
+    <link href="/stylesheets/site.css" media="screen" rel="stylesheet" type="text/css" />
+    <script type='text/javascript'>
+      //<![CDATA[
+        // Comment in javascript
+      //]]>
+    </script>
+    <title>GeckoCircle.com - Setting up a cheap IPsec / L2TP VPN on an Ubuntu 11.04 VPS</title>
+  </head>
+  <body class='howto howto_vpn'>
+    <div id='header'>
+      <div id='header-container'>
+        <div id='header-logo'>
+          <img alt="GeckoCircle logo" src="/images/geckocircle-logo.png" />
+        </div>
+        <div id='navbar'>
+          <div id='left-edge'>
+            <img alt="" src="/images/edge-left.gif" />
+          </div>
+          <span id='right-edge'>
+            <img alt="" src="/images/edge-right.gif" />
+          </span>
+          <ul class='navbar'>
+            <li>
+              <a href="/">Home</a>
+            </li>
+            <li>
+              <a href="/lipservice.html">lipService</a>
+            </li>
+            <li>
+              <a href="/contagion.html">Contagion</a>
+            </li>
+            <li>
+              <a href="/support.html">Support</a>
+            </li>
+            <li>
+              <a href="/howto/vpn.html">Tutorials</a>
+            </li>
+            <li>
+              <a href="/">About</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div id='main-container'>
+      <div id='main-content' role='main'>
+        <div class='content'>
+          <h2>IPsec / L2TP VPN on an Ubuntu 11.04 VPS</h2>
+          
+          <p>I use a VPN (Virtual Private Network) connection to access some of my servers when I'm on public WiFi networks or other untrusted networks.  VPNs can be useful for encrypting traffic between you and the VPN (preventing password sniffing, for example).  Lots of people will also use VPNs to make it appear as if their traffic is coming from another country - for example, to test GeoIP-dependant features of websites.  There's a number of VPN services on the net, such as StrongVPN or HotspotShield, that seem to cater to those wanting to watch Hulu in Canada, but that seems a bit sketchy.  Besides, you can have your own personal VPN for way cheaper than StrongVPN's monthly fee.</p>
+          
+          <p>Here's what I did - I found a special price by Googling around for a <a href="http://www.google.com/?q=cheap+xen+vps">Xen-based 256MB VPS</a> (virtual private server).  As best as I could tell, you really don't want an OpenVZ VPS, as IPsec isn't (or at least wasn't - haven't tested recently) supported on OpenVZ.  I'm not sure about VMWare.  I found a Xen VPS in Texas for $3.75/mo, with a couple of hundred GB of bandwidth, which is total overkill for my purposes (and for the video-streaming folk, this is quite a lot of video).  I configured the VPS with Ubuntu 11.04.  From a plain-vanilla Ubuntu 11.04, here's how you would proceed to get an OpenSWAN IPSec / L2TP VPN up and running that will allow you to connect pretty much any computer or mobile device.</p>
+          
+          <h2>Basic Linux-y Stuff</h2>
+          
+          <p>You'll need to SSH into your new VPS - if you're a Mac or Linux user, it's simple.  Just launch your Terminal, and type:</p>
+          
+          <pre><code>$ ssh root@YOUR.SERVER.IP.ADDRESS&#x000A;</code></pre>
+          
+          <p>If you're on Windows, grab <a href="http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html">PuTTY</a> or some other SSH client.</p>
+          
+          <p>Once logged in as root, set up a user account (since it's bad form to use root when you don't have to):</p>
+          
+          <pre><code>$ adduser drosboro&#x000A;</code></pre>
+          
+          <p>Follow the prompts, and pick a good password.  Then,</p>
+          
+          <pre><code>$ visudo&#x000A;</code></pre>
+          
+          <p>In the sudoers file, add the following line:</p>
+          
+          <pre><code>myusername ALL=(ALL:ALL) ALL&#x000A;</code></pre>
+          
+          <p>Save the file, then:</p>
+          
+          <pre><code>$ exit&#x000A;</code></pre>
+          
+          <p>From your computer, start a new SSH session with your new user:</p>
+          
+          <pre><code>$ ssh myusername@YOUR.SERVER.IP.ADDRESS&#x000A;</code></pre>
+          
+          <p>Install some handy packages that we'll need:</p>
+          
+          <pre><code>$ sudo aptitude install vim build-essential libgmp3-dev gawk flex bison&#x000A;</code></pre>
+          
+          <h3>Setting up SSH securely</h3>
+          
+          <p>I don't like using password authentication with SSH, and I also don't like running SSH on it's regular port.  Changing the port and using RSA key-based authentication will prevent some attacks.</p>
+          
+          <p>To change the port, you need to edit the sshd_config file:</p>
+          
+          <pre><code>$ sudo vim /etc/ssh/sshd_config&#x000A;</code></pre>
+          
+          <p>Change the following lines:</p>
+          
+          <pre><code>Port 1234&#x000A;PermitRootLogin no&#x000A;PasswordAuthentication no&#x000A;</code></pre>
+          
+          <p>For your port, instead of 1234, pick some number between 1024 and 65535.</p>
+          
+          <p>Save your file and exit the editor.</p>
+          
+          <p>I won't go into making SSH keys, but if you google <a href="http://www.google.com/?q=set+up+ssh+keys">"set up SSH keys"</a>, you'll get lots of hits.  Once you've got your public key,</p>
+          
+          <pre><code>$ mkdir ~/.ssh&#x000A;$ cat &gt; ~/.ssh/authorized_keys&#x000A;</code></pre>
+          
+          <p>Paste your public key, then type control-D to end the input.</p>
+          
+          <p>Reboot SSHD on your server, then log out:</p>
+          
+          <pre><code>$ sudo service ssh restart&#x000A;$ exit&#x000A;</code></pre>
+          
+          <p>Try logging back into your server with the new port - you shouldn't need your password this time.</p>
+          
+          <pre><code>$ ssh myusername@YOUR.SERVER.IP.ADDRESS -p 1234&#x000A;</code></pre>
+          
+          <h2>Getting IPSec up and running</h2>
+          
+          <p>First, install OpenSWAN - for this server, I used the latest (at the time) version and built it from source:</p>
+          
+          <pre><code>$ mkdir src&#x000A;$ cd src&#x000A;$ wget http://openswan.org/download/openswan-2.6.37.tar.gz&#x000A;$ tar xvzf openswan-2.6.37.tar.gz&#x000A;$ cd openswan-2.6.37&#x000A;$ make programs&#x000A;$ sudo make install&#x000A;</code></pre>
+          
+          <p>Edit your IPSec configuration:</p>
+          
+          <pre><code>$ sudo vim /etc/IPSec.conf&#x000A;</code></pre>
+          
+          <p>Here's the contents of the file, borrowed from elsewhere on the web:</p>
+          
+          <pre><code>version 2.0&#x000A;config setup&#x000A;    nat_traversal=yes&#x000A;    virtual_private=%v4:10.0.0.0/8,%v4:192.168.0.0/16,%v4:172.16.0.0/12&#x000A;    oe=off&#x000A;    protostack=netkey&#x000A;&#x000A;conn %default&#x000A;    forceencaps=yes&#x000A;&#x000A;conn L2TP-PSK-NAT&#x000A;    rightsubnet=vhost:%priv&#x000A;    also=L2TP-PSK-noNAT&#x000A;&#x000A;conn L2TP-PSK-noNAT&#x000A;    authby=secret&#x000A;    pfs=no&#x000A;    auto=add&#x000A;    keyingtries=3&#x000A;    rekey=no&#x000A;    ikelifetime=8h&#x000A;    keylife=1h&#x000A;    type=transport&#x000A;    left=YOUR.VPS.IP.ADDRESS&#x000A;    leftprotoport=17/1701&#x000A;    right=%any&#x000A;    rightprotoport=17/%any&#x000A;</code></pre>
+          
+          <p>Then,</p>
+          
+          <pre><code>$ sudo vim /etc/IPSec.secrets&#x000A;</code></pre>
+          
+          <p>This file should contain a line that looks like this:</p>
+          
+          <pre><code>YOUR.VPS.IP.ADDRESS %any: PSK "YourSecretCode"&#x000A;</code></pre>
+          
+          <p>"YourSecretCode" is a shared secret that every user (in my case, just me) of the VPN will know.  There's also a per-user password coming later.</p>
+          
+          <p>Lock down the secrets file:</p>
+          
+          <pre><code>$ sudo chmod 640 /etc/IPSec.secrets&#x000A;</code></pre>
+          
+          <p>To get IPSec running properly, you will need to adjust a few networking settings.  There's various ways to do this, but I did it like this:</p>
+          
+          <pre><code>$ ls /proc/sys/net/ipv4/conf&#x000A;</code></pre>
+          
+          <p>Make a note of all of the interfaces.  For my install, I had "all", "default", "eth0" and "lo".</p>
+          
+          <pre><code>$ sudo vim /etc/sysctl.conf&#x000A;</code></pre>
+          
+          <p>Add the following lines - but if your network interfaces are different than mine, you'll need to make the appropriate changes:</p>
+          
+          <pre><code>net.ipv4.ip_forward=1&#x000A;net.ipv4.conf.all.accept_redirects = 0&#x000A;net.ipv4.conf.default.accept_redirects = 0&#x000A;net.ipv4.conf.lo.accept_redirects = 0&#x000A;net.ipv4.conf.eth0.accept_redirects = 0&#x000A;net.ipv4.conf.all.send_redirects = 0&#x000A;net.ipv4.conf.lo.send_redirects = 0&#x000A;net.ipv4.conf.default.send_redirects = 0&#x000A;net.ipv4.conf.eth0.send_redirects = 0&#x000A;</code></pre>
+          
+          <p>Load your new settings with:</p>
+          
+          <pre><code>$ sudo sysctl -p&#x000A;</code></pre>
+          
+          <p>Then, try starting and verifying IPSec:</p>
+          
+          <pre><code>$ sudo service ipsec start&#x000A;$ sudo ipsec verify&#x000A;</code></pre>
+          
+          <p>I got the following output from the verify command:</p>
+          
+          <pre><code>Checking your system to see if IPsec got installed and started correctly:&#x000A;Version check and ipsec on-path                                 [OK]&#x000A;Linux Openswan U2.6.37/K2.6.38-8-generic-pae (netkey)&#x000A;Checking for IPsec support in kernel                            [OK]&#x000A; SAref kernel support                                           [N/A]&#x000A; NETKEY:  Testing XFRM related proc values                      [OK]&#x000A;    [OK]&#x000A;    [OK]&#x000A;Checking that pluto is running                                  [OK]&#x000A; Pluto listening for IKE on udp 500                             [OK]&#x000A; Pluto listening for NAT-T on udp 4500                          [OK]&#x000A;Checking for 'ip' command                                       [OK]&#x000A;Checking /bin/sh is not /bin/dash                               [WARNING]&#x000A;Checking for 'iptables' command                                 [OK]&#x000A;Opportunistic Encryption Support                                [DISABLED]&#x000A;</code></pre>
+          
+          <p>If the "Checking for IPsec support in kernel" line reads [FAILED], you may need to load the appropriate kernel module:</p>
+          
+          <pre><code>$ sudo modprobe af_key&#x000A;</code></pre>
+          
+          <p>If that's the case, you'll want that to happen every time you boot, so add it to /etc/modules:</p>
+          
+          <pre><code>$ sudo vim /etc/modules&#x000A;</code></pre>
+          
+          <p>Add the line:</p>
+          
+          <pre><code>af_key&#x000A;</code></pre>
+          
+          <p>And you're done.</p>
+          
+          <h3>Setting up L2TP</h3>
+          
+          <p>This part should be fairly straightforward.  First, install xl2tpd, then configure it:</p>
+          
+          <pre><code>$ sudo aptitude install xl2tpd&#x000A;$ sudo vim /etc/xl2tpd/xl2tpd.conf&#x000A;</code></pre>
+          
+          <p>The contents of my file look like this:</p>
+          
+          <pre><code>[lns default]&#x000A;ip range = 10.1.1.2-10.1.1.255&#x000A;local ip = 10.1.1.1&#x000A;require chap = yes&#x000A;refuse pap = yes&#x000A;require authentication = yes&#x000A;name = LinuxVPNserver&#x000A;ppp debug = yes&#x000A;pppoptfile = /etc/ppp/options.xl2tpd&#x000A;length bit = yes&#x000A;</code></pre>
+          
+          <p>Then,</p>
+          
+          <pre><code>$ sudo vim /etc/ppp/options.xl2tpd&#x000A;</code></pre>
+          
+          <p>The contents look like this:</p>
+          
+          <pre><code>require-mschap-v2&#x000A;ms-dns 8.8.8.8&#x000A;ms-dns 8.8.4.4&#x000A;asyncmap 0&#x000A;auth&#x000A;crtscts&#x000A;lock&#x000A;hide-password&#x000A;modem&#x000A;debug&#x000A;name l2tpd&#x000A;proxyarp&#x000A;lcp-echo-interval 30&#x000A;lcp-echo-failure 4&#x000A;</code></pre>
+          
+          <p>Last but not least, edit the following file to set up your user accounts:</p>
+          
+          <pre><code>$ sudo vim /etc/ppp/chap-secrets&#x000A;</code></pre>
+          
+          <p>Each desired user needs their own line in this file, following the format:</p>
+          
+          <pre><code>YOURUSERNAME l2tpd YOURPASSWORD *&#x000A;</code></pre>
+          
+          <h2>Finishing Up</h2>
+          
+          <p>You need to enable IP Masquerade in your firewall to allow access to the rest of the web from your VPN.  I just did this in my rc.local:</p>
+          
+          <pre><code>$ sudo vim /etc/rc.local&#x000A;</code></pre>
+          
+          <p>I added the following lines before the "exit 0" line:</p>
+          
+          <pre><code>iptables -t nat -A POSTROUTING -s 10.1.1.0/24 -o eth0 -j MASQUERADE&#x000A;service ipsec restart&#x000A;</code></pre>
+          
+          <p>Probably not necessary, but I like to finish off with a nice reboot, just to make sure everything will load up properly between server restarts...</p>
+          
+          <pre><code>$ sudo reboot&#x000A;</code></pre>
+          
+          <p>That's it!  At this point, you just need to configure your own devices to connect to your VPN.</p>
+          
+          <h2>Credit, where credit is due!</h2>
+          
+          <p>I got lots of guidance from <a href="http://freenuts.com/how-to-set-up-a-l2tpipsec-vpn-in-a-vps/">this How-To</a> - in fact, I've used its config files nearly exactly.  I changed a few things to make them align a bit more with my own personal Linux-y style.</p>
+        </div>
+        <div class='sidebar'>
+          <h3>How-To's</h3>
+          <ul>
+            <li><a href="/howto/vpn.html">IPsec/L2TP VPN on Ubuntu</a></li>
+            <li><a href="/howto/ssh.html">Securing SSH on your server</a></li>
+          </ul>
+        </div>
+      </div>
+      <div id='footer'>
+        Copyright &copy; 2011 GeckoCircle.com.  All Rights Reserved.
+      </div>
+    </div>
+  </body>
+</html>
